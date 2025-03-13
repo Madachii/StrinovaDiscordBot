@@ -1,20 +1,31 @@
 from components.games.Gambling.items import Item, Rarity
 
-DEFAULT_PROBABILITY = (0.0065, 0.05, 0.24, 0.7035)
 
 class Banner:
     """Represents a Strinova Banner""" 
-    def __init__(self, title, drop):
+
+    def __init__(self, title, drop, probabilities):
+
         self.title = title
         self.pool = {item.value: [] for item in Rarity}
+        self.weights = self.make_weights(probabilities)
 
         for item in drop:
             if not isinstance(item, Item):
-                print(f"{item} is not an valid item")
-                continue
+                raise ValueError(f"{item} is not a  valid item")
 
             self.pool[f"{item.rarity.value}"].append(item)
         
-        print(f"The avaliable legendary's in this banner are: {[x.name for x in self.pool['Legendary']]}") 
+    def make_weights(self, probabilities):
+        if (sum(probabilities) != 1):
+            raise ValueError(f"Failed to create the {self.title} banner, probabilities must add up to 1")
         
+        weights = [round(prob * 10000) for prob in probabilities]
         
+        cumulative_weights = []
+        add = 0
+        for w in weights:
+            add += w
+            cumulative_weights.append(add)
+            
+        return cumulative_weights

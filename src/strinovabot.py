@@ -27,7 +27,7 @@ class Bot:
         await self.bot.start(self.token) # TODO: make the main loop myself, instead of just using theirs
     
     async def load_cog(self, component):
-        await self.bot.add_cog(component(self.bot))
+        await self.bot.add_cog(component)
     
     async def load_cogs(self, components):
         for comp in components:
@@ -39,7 +39,6 @@ class Bot:
     async def load_cog_db(self, component, db):
         await self.bot.add_cog(component(self.bot, db))
         
-
     async def remove_cog(self, component):
         await self.bot.remove_cog(component.__cog_name__)
 
