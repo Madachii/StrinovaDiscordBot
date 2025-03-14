@@ -1,6 +1,7 @@
 import discord
 import aiosqlite
 import discord.ext.commands
+import secrets
 from components.component import Component
 from components.games.Gambling.strinovabanner import Banner
 from discord.ext import commands
@@ -25,8 +26,32 @@ class Gacha(commands.Cog, Component):
         
     @commands.command()
     async def pull(self, ctx, *, member: discord.Member = None):
-        await ctx.send("Pulled")
-        pass
+        if (len(self.banners) <= 0):
+            await ctx.send("There are no active banners at this time!")
+            return
+        
+        banner = self.banners[0] # TODO: check what banner the user has currently, else set it to the default one [the newest]
+        weights = banner.weights
+        
+        rng = secrets.SystemRandom().randrange(0, weights[-1])
+        drop = None
+        if rng >= 0 and rng < weights[0]:
+            rng = secrets.SystemRandom().randrange(0, len(banner.pool["Legendary"])) # TODO: Could take the modulo o the previous rng number and limit it between 0 - n where n is the drops
+            drop = banner.pool["Legendary"][rng]
+        elif rng >= weights[0] and rng < weights[1]:
+            rng = secrets.SystemRandom().randrange(0, len(banner.pool["Epic"]))
+            drop = banner.pool["Epic"][rng]
+        elif rng >= weights[1] and rng < weights[2]:
+            rng = secrets.SystemRandom().randrange(0, len(banner.pool["Rare"]))
+            drop = banner.pool["Rare"][rng]
+        elif rng >= weights[2] and rng < weights[3]:
+            rng = secrets.SystemRandom().randrange(0, len(banner.pool["Refined"]))
+            drop = banner.pool["Refined"][rng]
+
+        if (drop != None):
+            print("You got: " + drop.name)
+        else:
+            print("HUH")
         
     @commands.command()
     async def addp(self, ctx: discord.ext.commands.context.Context):

@@ -6,16 +6,31 @@ class DbManager:
         self.connection = None
         self.cursor = None
     
-    async def init_db(self):
-        self.connection = await aiosqlite.connect(self.path)
-        self.cursor = await self.connection.cursor()
-        
     async def create_db(self, args: str):
-        await self.init_db()
-        await self.cursor.execute(args)
-        await self.connection.commit()
+        async with aiosqlite.connect(self.path) as db:
+            await db.execute(args)
+            await db.commit()
             
-    async def execute(self, args: str):
-        await self.cursor.execute(args)
-        await self.connection.commit()
+
+    async def close(self):
+        if self.cursor:
+            await self.cursor.close()
+        if self.connection:
+            await self.connection.close()
         
+        
+class GachaDb(DbManager):
+    def __init__(self, path: str):
+        self.tables = """CREATE TABLE IF NOT EXISTS inventory
+                    (
+	                    userID INTEGER PRIMARY KEY NOT NULL,
+                        backpackID int UNIQUE,
+	                    points INTEGER DEFAULT 0
+                    );
+                    """
+    
+    async def add_drop():
+        pass
+    
+    async def get_stats(user):
+        pass

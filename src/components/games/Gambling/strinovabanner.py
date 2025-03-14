@@ -8,6 +8,7 @@ class Banner:
 
         self.title = title
         self.pool = {item.value: [] for item in Rarity}
+        self.drop = drop
         self.weights = self.make_weights(probabilities)
 
         for item in drop:
