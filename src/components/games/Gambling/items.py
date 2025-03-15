@@ -32,11 +32,12 @@ class Agent(Enum):
     EIKA = "Eika"
 
 class Item:
-    def __init__(self, name: str, rarity: Rarity, item_type: Item_Type, agent: Agent = None): # Make None be a "for all" value later
+    def __init__(self, name: str, rarity: Rarity, img_url: str = None, item_type: Item_Type = None, agent: Agent = None): # Make None be a "for all" value later
         self.name = name
         self.agent = agent
         self.rarity = rarity
         self.item_type = item_type
+        self.img_url = img_url 
         
 # class Outfit(Item):
 #     def __init__(self, name, rarity):

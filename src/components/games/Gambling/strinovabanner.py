@@ -1,8 +1,9 @@
-from components.games.Gambling.items import Item, Rarity
+from components.games.gambling.items import Item, Rarity
 
 
 class Banner:
     """Represents a Strinova Banner""" 
+
 
     def __init__(self, title, drop, probabilities):
 

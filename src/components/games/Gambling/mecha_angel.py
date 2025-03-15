@@ -1,4 +1,4 @@
-from components.games.Gambling.items import *
+from components.games.gambling.items import *
 
 Drops = {
     Item("Mecha Angel", Rarity.LEGENDARY, Item_Type.OUTFIT, Agent.KOKONA),
