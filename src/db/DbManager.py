@@ -1,4 +1,5 @@
 import aiosqlite
+import uuid
 from typing import List, Tuple
 
 class DbManager:
@@ -38,6 +39,9 @@ class DbManager:
 
         return result
     
+    async def generate_uuid(self, name: str):
+        return str(uuid.uuid5(uuid.NAMESPACE_DNS, name))
+
     async def close(self):
         if self.cursor:
             await self.cursor.close()
