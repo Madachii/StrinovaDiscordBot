@@ -56,123 +56,107 @@ class Gacha(commands.Cog, Component):
         
     @commands.command()
     async def pull(self, ctx: discord.ext.commands.context.Context):
-        if (len(self.banners) <= 0):
-            await ctx.send("There are no active banners at this time!")
-            return
-    
-            # data = await self.db.get_user_data(ctx.author.id, "bablo", "active_banner", "weight_legendary", "weight_epic", "weight_rare", "weight_refined")
-        data = await self.db.get_user_data(ctx.author.id)
-        if not data:
-            print(f"Failed to get data for: {ctx.author.name}")
-            return
-
-        _, user_bablo, user_banner, legendary_pulls, epic_pulls, weight_legendary, weight_epic, weight_rare, weight_refined = data[0]
-        if (not user_bablo or not user_banner):
-            await ctx.send("Internal error bwah")
-            return
-        
-        if (user_bablo < Gacha.PULL_PRICE):
-            await ctx.send("You don't have enough bablo")
-            return
-        
-        banner = self.get_banner_from_uuid(user_banner)
-        
-        if (banner is None):
-            print("Failed to find banner")
-            return
-        
-        user_drop = None
-        item_id = title = rarity = url = None
-        difference = 0
-        args = []
         try:
+            if (len(self.banners) <= 0):
+                await ctx.send("There are no active banners at this time!")
+                return
+        
+            data = await self.db.get_user_data(ctx.author.id)
+            if not data:
+                print(f"Failed to get data for: {ctx.author.name}")
+                return
+
+            _, user_bablo, user_banner, legendary_pulls, epic_pulls, weight_legendary, weight_epic, weight_rare, weight_refined = data[0]
+            if (not user_bablo or not user_banner):
+                await ctx.send("Internal error bwah")
+                return
+            
+            if (user_bablo < Gacha.PULL_PRICE):
+                await ctx.send("You don't have enough bablo")
+                return
+            
+            banner = self.get_banner_from_uuid(user_banner)
+            
+            if (banner is None):
+                print("Failed to find banner")
+                return
+            
+            user_drop = None
+            item_id = title = rarity = url = None
+            difference = 0
+            args = []
+
             if (legendary_pulls >= 80):
                 user_drop = await banner.pull(self.cumulative_weights((100000, 0, 0, 0)))
-                args.append(('weight_legendary', self.db.weight_legendary))
-                args.append(('legendary_pulls', 0))
-                difference -= weight_legendary - self.db.weight_legendary
-                print(f"differnece is: {difference} ")
-                # await self.legendary_pull(ctx.author.id, weight_legendary, weight_refined)
-                 
+                args, difference = await self.legendary_pull(weight_legendary, pity=True) # doesnt clear completly, need to change weight_legendary to db and fix it
+                print("difference in legendary is: " + str(difference))
+                    
             elif (epic_pulls >= 30):
                 user_drop = await banner.pull(self.cumulative_weights((0,100000, 0, 0)))
-                args.append(('weight_epic', self.db.weight_epic))
-                args.append(('epic_pulls', 0))
-                difference -= weight_epic - self.db.weight_epic
-                
+                args, difference = await self.epic_pull(weight_epic, epic_pulls = 0, pity=True)
+
             else:
                 cumulative_weights = self.cumulative_weights((weight_legendary, weight_epic, weight_rare, weight_refined)) 
                 user_drop = await banner.pull(cumulative_weights)
                 
                 _, _, rarity, _ = user_drop
                 if rarity == "Legendary":
-                    args.append(('weight_legendary', self.db.weight_legendary))
-                    args.append(('legendary_pulls', 0 ))
-                    difference -= weight_legendary - self.db.weight_legendary
+                    args, difference = await self.legendary_pull(weight_legendary, legendary_pulls = 0, pity=True)
                 else:
-                    difference += self.db.pity_bonus_legendary
-                    args.append(('weight_legendary', weight_legendary + self.db.pity_bonus_legendary))
-                    args.append(('legendary_pulls', legendary_pulls + 1))
-                    
+                    extra_args, extra_difference = await self.legendary_pull(weight_legendary, legendary_pulls + 1, self.db.pity_bonus_legendary, pity=False)
+                    difference += extra_difference
+                    args.extend(extra_args)
+
                 if rarity == "Epic":
-                    difference -= weight_epic - self.db.weight_epic
-                    args.append(('weight_epic', self.db.weight_epic))
-                    args.append(('epic_pulls', 0))
-                    print("Difference in epic is: " + str(difference))
+                    args, difference = await self.epic_pull(weight_epic, epic_pulls = 0, pity=True)
                 else:
-                    difference += self.db.pity_bonus_epic
-                    args.append(('weight_epic', weight_epic + self.db.pity_bonus_epic))
-                    args.append(('epic_pulls', epic_pulls + 1))
-                    
+                    extra_args, extra_difference = await self.epic_pull(weight_epic, epic_pulls + 1, self.db.pity_bonus_epic, pity=False)
+                    args.extend(extra_args)
+                    difference += extra_difference
+
                 difference += self.db.pity_bonus_rare
+
                 args.append(('weight_rare', weight_rare + self.db.pity_bonus_rare))
-                
 
             args.append(('weight_refined', weight_refined - difference))
             await self.db.update_user(ctx.author.id, args)
-            print(str(args))
 
-        except Exception as e:
-            print(f"I FUCKING HATE IT HERE: {e}" )
-        
-        item_id, title, rarity, url = user_drop 
-        
-        try:
-            await self.db.update_user(ctx.author.id, 
-                [
-                    ('bablo', user_bablo - Gacha.PULL_PRICE), 
-                ]
-            )
-        except Exception as e:
-            print(f"im gae {e}")
-        
-        try:
-            await self.db.add_drop(ctx.author.id, banner.uuid, item_id)
+            item_id, title, rarity, url = user_drop 
+            
+            await self.db.update_user(ctx.author.id, [('bablo', user_bablo - Gacha.PULL_PRICE)])
+
+            await self.db.add_drop(ctx.author.id, banner.uuid, item_id, rarity)
+
             embed = self.embed_pull_message(user_bablo, title, rarity, url)
-        except Exception as e:
-            print(f"Im mega gae {e}")
 
-        await ctx.send(embed=embed)
+            await ctx.send(embed=embed)
+        except Exception as e:
+            print(e)
+
+    async def legendary_pull(self, weight_legendary = 0, legendary_pulls = 0, weight_pity = 0, pity = False):
+        difference = 0
+        args = []        
+        if pity:
+            args = [('weight_legendary', self.db.weight_legendary), ('legendary_pulls', 0)]
+            difference += self.db.weight_legendary - weight_legendary
+        else:
+            args = [('weight_legendary', weight_legendary + weight_pity), ('legendary_pulls', legendary_pulls)]
+            difference += self.db.pity_bonus_legendary
         
-    async def epic_pull(self, discord_id, weight_epic, weight_refined):
-        difference = weight_epic - self.db.weight_epic
-        await self.db.update_user(discord_id, 
-            [
-                ('weight_epic', self.db.weight_epic), 
-                ('weight_refined', weight_refined + difference)
-            ]
-        )
-   
-        
-    async def legendary_pull(self, discord_id, weight_legendary, weight_refined):
-        difference = weight_legendary - self.db.weight_legendary
-        await self.db.update_user(discord_id, 
-            [
-                ('weight_legendary', self.db.weight_legendary), 
-                ('weight_refined', weight_refined + difference)
-            ]
-        )  
+        return (args, difference)
     
+    async def epic_pull(self, weight_epic, epic_pulls, weight_pity = 0, pity = False):
+        difference = 0
+        args = []        
+        if pity:
+            args = [('weight_epic', self.db.weight_epic), ('epic_pulls', 0)]
+            difference += self.db.weight_epic - weight_epic 
+        else:
+            args = [('weight_epic', weight_epic + weight_pity), ('epic_pulls', epic_pulls)]
+            difference += self.db.pity_bonus_epic
+
+        return (args, difference)
+        
     
     def cumulative_weights(self, weights):
         cumulative_weights = []
@@ -201,17 +185,13 @@ class Gacha(commands.Cog, Component):
 
     @commands.command()
     async def debug(self, ctx: discord.ext.commands.context.Context, amount: int):
-        await self.db.add_user(ctx.author.id)
         try:
-            await self.db.update_user(ctx.author.id, 
-                [
-                    ("bablo", amount)
-                ]
-            )
+            await self.db.add_user(ctx.author.id)
+            await self.db.update_user(ctx.author.id, [("bablo", amount)])
+            await ctx.send(f"Increased {ctx.author.name} bablo by {amount}!")
+
         except Exception as e:
             print(e)
-
-        await ctx.send(f"Increased {ctx.author.name} bablo by {amount}!")
     
     def help(self):
         # Implement the help method here, as Component's help is abstract

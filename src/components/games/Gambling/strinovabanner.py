@@ -17,7 +17,6 @@ class Banner:
          
    
     async def pull(self, weights):
-        print(weights)
         try:
             probability = {"0" : 0, "1" : 1, "2" : 2, "3" : 3}
             for x in range(10000):
@@ -25,7 +24,6 @@ class Banner:
                 idx = bisect.bisect_right(weights, rng)
                 probability[str(idx)] += 1
             
-            print(probability)
         except Exception as e:
             print(e) 
         banner_drops = await self.db.get_banner_drops(self.uuid, self.RARITY_MAPPING[idx])

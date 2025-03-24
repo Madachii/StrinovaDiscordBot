@@ -50,8 +50,9 @@ class GachaDb(DbManager):
             (
                 userID BIGINT PRIMARY KEY NOT NULL,
                 bablo INTEGER DEFAULT {GachaDb.default_bablo},
+                basestring INTEGER DEFAULT 0,
                 active_banner BLOB NOT NULL,
-                legendary_pulls INTEGER DEFAULT 70,
+                legendary_pulls INTEGER DEFAULT 0,
                 epic_pulls INTEGER DEFAULT 0,
                 weight_legendary INTEGER DEFAULT {self.weight_legendary},
                 weight_epic INTEGER DEFAULT {self.weight_epic},
@@ -122,7 +123,8 @@ class GachaDb(DbManager):
         
         return result
 
-    async def add_drop(self, discord_id, banner_id, item_id):
+    # I don't remember the basestring you get from getting the same skin ;-;
+    async def add_drop(self, discord_id, banner_id, item_id, rarity):
         await self.add_user(discord_id)
 
         cmd = ""
