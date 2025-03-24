@@ -54,6 +54,7 @@ class GachaDb(DbManager):
                 active_banner BLOB NOT NULL,
                 legendary_pulls INTEGER DEFAULT 0,
                 epic_pulls INTEGER DEFAULT 0,
+                rare_pulls INTEGER DEFAULT 0,
                 weight_legendary INTEGER DEFAULT {self.weight_legendary},
                 weight_epic INTEGER DEFAULT {self.weight_epic},
                 weight_rare INTEGER DEFAULT {self.weight_rare},
@@ -117,7 +118,7 @@ class GachaDb(DbManager):
             SELECT itemID, itemName, rarity, url FROM banner_drops
         """
         if (rarity != "ALL"):
-            cmd += f"WHERE rarity = '{rarity}' AND bannerID = '{uuid}'" # TODO: need to make a system to limit these, just writing pure strings is bad
+            cmd += f"WHERE rarity = '{rarity}' AND bannerID = '{uuid}'" 
         
         result = await super().execute(cmd) 
         

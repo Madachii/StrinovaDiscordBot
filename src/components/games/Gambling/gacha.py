@@ -2,6 +2,7 @@ import discord
 import discord.ext.commands
 import secrets
 import bisect
+import asyncio
 from components.component import Component
 from components.games.gambling.strinovabanner import Banner
 from discord.ext import commands
@@ -53,20 +54,31 @@ class Gacha(commands.Cog, Component):
         except Exception as e:
             print(e)
         
-        
+    
     @commands.command()
-    async def pull(self, ctx: discord.ext.commands.context.Context):
+    async def pull(self, ctx: discord.ext.commands.context.Context, times: int):
         try:
             if (len(self.banners) <= 0):
                 await ctx.send("There are no active banners at this time!")
                 return
+
+            tasks = [self.__pull(ctx) for i in range(times)]
+            result = await asyncio.gather(*tasks)
+            print(result)
+
+        except Exception as e:
+            print(e)
         
+    async def __pull(self, ctx: discord.ext.commands.context.Context):
+        print(ctx.author.id)
+        try:
             data = await self.db.get_user_data(ctx.author.id)
             if not data:
                 print(f"Failed to get data for: {ctx.author.name}")
                 return
 
-            _, user_bablo, user_banner, legendary_pulls, epic_pulls, weight_legendary, weight_epic, weight_rare, weight_refined = data[0]
+            print(data)
+            _, user_bablo, basestring,user_banner, legendary_pulls, epic_pulls, rare_pulls, weight_legendary, weight_epic, weight_rare, weight_refined = data[0]
             if (not user_bablo or not user_banner):
                 await ctx.send("Internal error bwah")
                 return
@@ -88,13 +100,17 @@ class Gacha(commands.Cog, Component):
 
             if (legendary_pulls >= 80):
                 user_drop = await banner.pull(self.cumulative_weights((100000, 0, 0, 0)))
-                args, difference = await self.legendary_pull(weight_legendary, pity=True) # doesnt clear completly, need to change weight_legendary to db and fix it
+                args, difference = await self.legendary_pull(weight_legendary, legendary_pulls=0, pity=True) # doesnt clear completly, need to change weight_legendary to db and fix it
                 print("difference in legendary is: " + str(difference))
                     
             elif (epic_pulls >= 30):
                 user_drop = await banner.pull(self.cumulative_weights((0,100000, 0, 0)))
                 args, difference = await self.epic_pull(weight_epic, epic_pulls = 0, pity=True)
 
+            elif (rare_pulls >= 10):
+                user_drop = await banner.pull(self.cumulative_weights((0,0,100000, 0)))
+                args, difference = await self.rare_pull(weight_rare, rare_pulls=0, pity=True)
+                
             else:
                 cumulative_weights = self.cumulative_weights((weight_legendary, weight_epic, weight_rare, weight_refined)) 
                 user_drop = await banner.pull(cumulative_weights)
@@ -114,22 +130,26 @@ class Gacha(commands.Cog, Component):
                     args.extend(extra_args)
                     difference += extra_difference
 
-                difference += self.db.pity_bonus_rare
-
-                args.append(('weight_rare', weight_rare + self.db.pity_bonus_rare))
+                if rarity == "Rare":
+                    args, difference = await self.rare_pull(weight_rare, rare_pulls=0, pity=True)
+                else:
+                    extra_args, extra_difference = await self.rare_pull(weight_rare, rare_pulls + 1, self.db.pity_bonus_rare, pity=False)
+                    args.extend(extra_args)
+                    difference += extra_difference
 
             args.append(('weight_refined', weight_refined - difference))
+            args.append(('bablo', user_bablo - Gacha.PULL_PRICE))
             await self.db.update_user(ctx.author.id, args)
 
             item_id, title, rarity, url = user_drop 
-            
-            await self.db.update_user(ctx.author.id, [('bablo', user_bablo - Gacha.PULL_PRICE)])
 
             await self.db.add_drop(ctx.author.id, banner.uuid, item_id, rarity)
 
             embed = self.embed_pull_message(user_bablo, title, rarity, url)
 
             await ctx.send(embed=embed)
+
+            return ((ctx.author.id, banner.uuid, item_id, rarity))
         except Exception as e:
             print(e)
 
@@ -157,6 +177,17 @@ class Gacha(commands.Cog, Component):
 
         return (args, difference)
         
+    async def rare_pull(self, weight_rare, rare_pulls, weight_pity = 0, pity = False):
+        difference = 0
+        args = []        
+        if pity:
+            args = [('weight_rare', self.db.weight_rare), ('rare_pulls', 0)]
+            difference += self.db.weight_rare - weight_rare 
+        else:
+            args = [('weight_rare', weight_rare + weight_pity), ('rare_pulls', rare_pulls)]
+            difference += self.db.pity_bonus_rare
+
+        return (args, difference)
     
     def cumulative_weights(self, weights):
         cumulative_weights = []
