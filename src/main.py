@@ -3,12 +3,17 @@ from dotenv import load_dotenv
 from strinovabot import *
 from discord.ext import commands
 from components.games.gambling.gacha import Gacha
+from components.games.gambling.rarity_game import RarityGame
+from components.games.gambling.banner_manager import BannerManager
 from db.GachaDb import GachaDb
+import logging
 
+logger = logging.getLogger(__name__)
 
 async def main():
-
     load_dotenv()
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+
     token = os.getenv('TOKEN')
 
     bot = Bot(token)
@@ -17,14 +22,16 @@ async def main():
     await gacha_db.clear()
     await gacha_db.create_default_tables()
     await gacha_db.load_banners_from_csv(r"src/components/games/gambling/banners") 
+    logger.info("Recreated the database")
 
-    gacha = Gacha(bot, gacha_db)
-    
+    gacha = Gacha(bot, gacha_db, logger)
+    rarity_game = RarityGame(bot, gacha_db, logger)
+
     for banner in gacha_db.tables:
         uuid, name = banner
-        gacha.load_banner(uuid, name)
-
-    components = [gacha]
+        BannerManager.load_banner(db=gacha_db, logger=logger, uuid=uuid, banner_name=name)
+    
+    components = [gacha, rarity_game]
     
     await bot.load_cogs(components)
     await bot.init()
