@@ -2,8 +2,8 @@ import discord
 import discord.ext.commands
 import asyncio
 from components.component import Component
-from components.games.gambling.strinovabanner import Banner
-from components.games.gambling.banner_manager import BannerManager
+from components.games.gambling import BannerManager, GConstants
+from components.games.gambling.user import User
 from discord.ext import commands
 from db.GachaDb import GachaDb
 import discord.ext
@@ -45,13 +45,6 @@ class RollAgainButton(discord.ui.View):
         return f"You are going to pull {times} more times"
 
 class Gacha(commands.Cog, Component):
-    DEFAULT_PROBABILITY = (0.0065, 0.05, 0.24, 0.7035)
-    RARITY_MAPPING = {0: "Legendary", 1: "Epic", 2: "Rare", 3: "Refined"}
-    COLOR_MAPPING = {"Legendary": "#F85555", "Epic": "#FFC555", "Rare": "#F285FF", "Refined": "#60A3F7"}
-    EMOMTE_MAPPING = {"Legendary": "🟥", "Epic" : "🟨", "Rare": "🟪", "Refined": "🟦"}
-    RANK_MAPPING = {"Legendary" : 0, "Epic" : 1, "Rare" : 2, "Refined" : 3}
-    PULL_PRICE = 120
-
     def __init__(self, bot, db: GachaDb, logger: logging.Logger):
         self.bot = bot
         self.db = db
@@ -78,7 +71,7 @@ class Gacha(commands.Cog, Component):
             embed: discord.Embed = discord.Embed()
             embed.title = f"{ctx.author.name} inventory"
              
-            description = "\n".join(f"{self.EMOMTE_MAPPING[row[1]]} {row[0]}" for row in result) # TODO: add like a colored cube to represent rarity
+            description = "\n".join(f"{GConstants.RARITY_MAPPING[row[1][1]]} {row[0]}" for row in result) # TODO: make this more clean later
             embed.set_footer(text=f"You have {user_bablo} babloons")
                 
             embed.description = description
@@ -95,23 +88,28 @@ class Gacha(commands.Cog, Component):
             if BannerManager.is_empty():
                 raise RuntimeError("There are no active banners at this time!")
 
+            user: User = await User.get_user_data(ctx.author.id, self.db)
+            
+            print(user)
+            
             data = await self.db.get_user_data(ctx.author.id)
+            data = data[0]
             if not data:
                 raise RuntimeError(f"Data for {ctx.author.name} is empty or invalid")
 
-            _, user_bablo, _, user_banner, _, _, _, _, _, _, _ = data[0]
-
+            # _, user_bablo, _, user_banner, _, _, _, _, _, _, _ = data[0]
+            user_bablo, user_banner = (data[1], data[3])
             banner = BannerManager.get_banner_from_uuid(user_banner)
             if (banner is None):
                 raise RuntimeError("Failed to find banner")
            
-            final_price = Gacha.PULL_PRICE * times
+            final_price = GConstants.PULL_PRICE * times
             if (user_bablo < final_price):
                raise RuntimeError (f"You don't have enough bablo for: {times} pulls: {user_bablo} / {final_price}") 
             
             self.logger.info(f"Initial conditions passed for {ctx.author.name}!")
             
-            loop_data = data[0]
+            loop_data = data
             drops = []
             for _ in range(times):
                 loop_data = await banner.pull(ctx, loop_data, banner, drops)  
@@ -135,7 +133,7 @@ class Gacha(commands.Cog, Component):
             tasks = [self.db.add_drop(ctx.author.id, user_banner, item_id, rarity) for item_id, _, rarity, _ in drops]
             return_val = await asyncio.gather(*tasks)
 
-            embed = self.embed_pull_message(ctx.author.id, user_bablo - final_price, drops) # continue doing clean up cause my frens don't let me...
+            embed = self.embed_pull_message(user_bablo - final_price, drops)
             
             view = RollAgainButton(self, ctx, times=times)
             
@@ -144,21 +142,23 @@ class Gacha(commands.Cog, Component):
         except Exception as e:
             print(e)
         
-    def embed_pull_message(self, discord_id, bablo, drops):
+    def embed_pull_message(self, bablo, drops):
         _, itemName, mvp_rarity, mvp_url = drops[0]
         description = ""
         for drop in drops:
             itemID, itemName, rarity, url = drop
 
-            if (self.RANK_MAPPING[rarity] <= self.RANK_MAPPING[mvp_rarity]):
+            current_emote, current_rank = GConstants.RARITY_MAPPING[rarity][1:]
+            mvp_rank = GConstants.RARITY_MAPPING[mvp_rarity][2]
+
+            if (current_rank <= mvp_rank):
                 itemID, itemName, mvp_rarity, mvp_url = drop
                 
-            description += f"{self.EMOMTE_MAPPING[rarity]} {itemName}\n"
+            description += f"{current_emote} {itemName}\n"
         
-        embed: discord.Embed = discord.Embed()
+        embed: discord.Embed = discord.Embed(description=description)
         embed.title = "The result of the pulls are..." 
-        embed.colour = discord.Colour.from_str(Gacha.COLOR_MAPPING[mvp_rarity])
-        embed.description = description
+        embed.colour = discord.Colour.from_str(GConstants.RARITY_MAPPING[mvp_rarity][0]) # TODO: make this cleaner later
         embed.set_image(url=mvp_url)
         embed.set_footer(text=f"You still have {bablo} bablo left!")
 

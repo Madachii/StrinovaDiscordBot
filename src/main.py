@@ -1,10 +1,7 @@
 import asyncio, os
 from dotenv import load_dotenv
 from strinovabot import *
-from discord.ext import commands
-from components.games.gambling.gacha import Gacha
-from components.games.gambling.rarity_game import RarityGame
-from components.games.gambling.banner_manager import BannerManager
+from components.games.gambling import Gacha, RarityGame, BannerManager
 from db.GachaDb import GachaDb
 import logging
 

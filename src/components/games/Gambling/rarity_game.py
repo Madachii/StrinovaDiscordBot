@@ -2,8 +2,7 @@ import discord
 import discord.ext.commands
 import asyncio
 from components.component import Component
-from components.games.gambling.strinovabanner import Banner
-from components.games.gambling.banner_manager import BannerManager
+from components.games.gambling import Banner, BannerManager, GConstants
 from discord.ext import commands
 from db.GachaDb import GachaDb
 import discord.ext
@@ -85,7 +84,7 @@ class RarityGame(commands.Cog, Component):
 
             user_bablo *= final_mult
 
-
+            embed = self.embed_pull_message(500, drops)
             print(count)
             print(final_mult)
 
@@ -102,3 +101,20 @@ class RarityGame(commands.Cog, Component):
             return mult_factor * (1 / 2**mult_val)
         return 1
     
+
+    def embed_pull_message(self, bablo, drops):
+        _, itemName, mvp_rarity, mvp_url = drops[0]
+        description = ""
+        for drop in drops:
+            itemID, itemName, rarity, url = drop
+
+            current_emote = GConstants.RARITY_MAPPING[rarity][0]
+            description += f"{current_emote} {itemName}\n"
+        
+        embed: discord.Embed = discord.Embed(description=description, url=mvp_url)
+        embed.title = "The result of the pulls are..." 
+        embed.colour = discord.Colour.from_str(GConstants.RARITY_MAPPING[mvp_rarity][0]) # TODO: make this cleaner later
+        embed.set_footer(text=f"You still have {bablo} bablo left!")
+
+        return embed
+
