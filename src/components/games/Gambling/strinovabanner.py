@@ -1,15 +1,14 @@
 from components.games.gambling.items import Item, Rarity
+from components.games.gambling.user import User 
 from db import GachaDb
 import secrets, bisect
 import discord.ext
 
 class Banner:
     
-    RARITY_MAPPING = {0: "Legendary", 1: "Epic", 2: "Rare", 3: "Refined"}
-    """Represents a Strinova Banner""" 
+    RARITY_MAPPING = {0: "Legendary", 1: "Epic", 2: "Rare", 3: "Refined"} 
 
     def __init__(self, uuid, db: GachaDb, title: str, logger):
-
         self.uuid = uuid
         self.db = db
         self.title = title
@@ -26,71 +25,71 @@ class Banner:
 
         return user_drop
 
-    async def pull(self, ctx: discord.ext.commands.context.Context, loop_data, banner, drops):
+    async def pull(self, ctx: discord.ext.commands.context.Context, user: User, banner, drops):
+        print(user)
         try:
-            _, user_bablo, basestring,user_banner, legendary_pulls, epic_pulls, rare_pulls, weight_legendary, weight_epic, weight_rare, weight_refined = loop_data
-            
             user_drop = None
             difference = 0
             args = []
 
-            if sum((weight_legendary, weight_epic, weight_rare, weight_refined)) != 100000:
+            if sum((user.weight_legendary, user.weight_epic, user.weight_rare, user.weight_refined)) != 100000:
                 self.logger.warning(f"The weights got messed up for {ctx.author.name}")
                 return
 
-            if (legendary_pulls >= 80):
+            if (user.legendary_pulls >= 80):
                 user_drop = await self.get_drop(self.cumulative_weights((100000, 0, 0, 0)))
-                weight_legendary, legendary_pulls, difference = await self.legendary_pull(weight_legendary, legendary_pulls=0, pity=True)
+                user.weight_legendary, user.legendary_pulls, difference = await self.legendary_pull(user.weight_legendary, legendary_pulls=0, pity=True)
                     
-            elif (epic_pulls >= 30):
+            elif (user.epic_pulls >= 30):
                 user_drop = await self.get_drop(self.cumulative_weights((0,100000, 0, 0)))
-                weight_epic, epic_pulls, difference = await self.epic_pull(weight_epic, epic_pulls = 0, pity=True)
+                user.weight_epic, user.epic_pulls, difference = await self.epic_pull(user.weight_epic, epic_pulls = 0, pity=True)
 
-            elif (rare_pulls >= 10):
+            elif (user.rare_pulls >= 10):
                 user_drop = await self.get_drop(self.cumulative_weights((0,0,100000, 0)))
-                weight_rare, rare_pulls, difference = await self.rare_pull(weight_rare, rare_pulls=0, pity=True)
+                user.weight_rare, user.rare_pulls, difference = await self.rare_pull(user.weight_rare, rare_pulls=0, pity=True)
                 
             else:
-                cumulative_weights = self.cumulative_weights((weight_legendary, weight_epic, weight_rare, weight_refined)) 
+                cumulative_weights = self.cumulative_weights((user.weight_legendary, user.weight_epic, user.weight_rare, user.weight_refined)) 
                 user_drop = await self.get_drop(cumulative_weights)
                 
                 _, _, rarity, _ = user_drop
                 extra_weight = extra_pulls = extra_difference = 0
                 if rarity == "Legendary":
-                    extra_weight, extra_pulls, extra_difference = await self.legendary_pull(weight_legendary, legendary_pulls=0, pity=True)
+                    extra_weight, extra_pulls, extra_difference = await self.legendary_pull(user.weight_legendary, legendary_pulls=0, pity=True)
                 else:
-                    extra_weight, extra_pulls, extra_difference = await self.legendary_pull(weight_legendary, legendary_pulls + 1, self.db.pity_bonus_legendary, pity=False)
+                    extra_weight, extra_pulls, extra_difference = await self.legendary_pull(user.weight_legendary, user.legendary_pulls + 1, self.db.pity_bonus_legendary, pity=False)
 
-                weight_legendary = extra_weight
-                legendary_pulls = extra_pulls
+                user.weight_legendary = extra_weight
+                user.legendary_pulls = extra_pulls
                 difference += extra_difference
                 
                 if rarity == "Epic":
-                    extra_weight, extra_pulls, extra_difference = await self.epic_pull(weight_epic, epic_pulls = 0, pity=True)
+                    extra_weight, extra_pulls, extra_difference = await self.epic_pull(user.weight_epic, epic_pulls = 0, pity=True)
                 else:
-                    extra_weight, extra_pulls, extra_difference = await self.epic_pull(weight_epic, epic_pulls + 1, self.db.pity_bonus_epic, pity=False)
+                    extra_weight, extra_pulls, extra_difference = await self.epic_pull(user.weight_epic, user.epic_pulls + 1, self.db.pity_bonus_epic, pity=False)
 
-                weight_epic = extra_weight
+                user.weight_epic = extra_weight
                 epic_pulls = extra_pulls
                 difference += extra_difference
 
                 if rarity == "Rare":
-                    extra_weight, extra_pulls, extra_difference = await self.rare_pull(weight_rare, rare_pulls=0, pity=True)
+                    extra_weight, extra_pulls, extra_difference = await self.rare_pull(user.weight_rare, rare_pulls=0, pity=True)
                 else:
-                    extra_weight, extra_pulls, extra_difference = await self.rare_pull(weight_rare, rare_pulls + 1, self.db.pity_bonus_rare, pity=False)
+                    extra_weight, extra_pulls, extra_difference = await self.rare_pull(user.weight_rare, user.rare_pulls + 1, self.db.pity_bonus_rare, pity=False)
                 
-                weight_rare = extra_weight
-                rare_pulls = extra_pulls
+                user.weight_rare = extra_weight
+                user.rare_pulls = extra_pulls
                 difference += extra_difference
 
-            weight_refined -= difference
+            user.weight_refined -= difference
 
             drops.append(user_drop)
-            return _, user_bablo, basestring,user_banner, legendary_pulls, epic_pulls, rare_pulls, weight_legendary, weight_epic, weight_rare, weight_refined
+            return user 
 
         except Exception as e:
             print(e)
 
+    # TODO: clean this code... alot.
     async def legendary_pull(self, weight_legendary = 0, legendary_pulls = 0, weight_pity = 0, pity = False):
         post_weight = post_pulls = difference = 0
         if pity:

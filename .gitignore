@@ -175,3 +175,6 @@ cython_debug/
 
 # custom 
 .scraper
+
+# db
+components/games/gambling/db/gacha.db

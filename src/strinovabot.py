@@ -14,12 +14,12 @@ class Bot:
         
         @self.bot.event
         async def on_ready():
-            print("worked yey")
+            print("Connected")
 
 
         @self.bot.command()
         async def test(ctx):
-            print("asd")
+            print("test")
             pass
     
 

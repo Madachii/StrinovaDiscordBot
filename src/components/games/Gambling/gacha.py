@@ -89,51 +89,42 @@ class Gacha(commands.Cog, Component):
                 raise RuntimeError("There are no active banners at this time!")
 
             user: User = await User.get_user_data(ctx.author.id, self.db)
-            
-            print(user)
-            
-            data = await self.db.get_user_data(ctx.author.id)
-            data = data[0]
-            if not data:
+            if not user:
                 raise RuntimeError(f"Data for {ctx.author.name} is empty or invalid")
 
-            # _, user_bablo, _, user_banner, _, _, _, _, _, _, _ = data[0]
-            user_bablo, user_banner = (data[1], data[3])
-            banner = BannerManager.get_banner_from_uuid(user_banner)
+            banner = BannerManager.get_banner_from_uuid(user.active_banner)
             if (banner is None):
                 raise RuntimeError("Failed to find banner")
            
             final_price = GConstants.PULL_PRICE * times
-            if (user_bablo < final_price):
-               raise RuntimeError (f"You don't have enough bablo for: {times} pulls: {user_bablo} / {final_price}") 
+            if (user.bablo < final_price):
+               raise RuntimeError (f"You don't have enough bablo for: {times} pulls: {user.bablo} / {final_price}") 
             
             self.logger.info(f"Initial conditions passed for {ctx.author.name}!")
             
-            loop_data = data
             drops = []
             for _ in range(times):
-                loop_data = await banner.pull(ctx, loop_data, banner, drops)  
+                user = await banner.pull(ctx, user, banner, drops)  
 
             # make this into a unpacking dict
-            _, user_bablo, _, user_banner, legendary_pulls, epic_pulls, rare_pulls, weight_legendary, weight_epic, weight_rare, weight_refined = loop_data
             args = [
-                ('bablo', user_bablo - final_price),
-                ('weight_legendary', weight_legendary),
-                ('weight_epic', weight_epic),
-                ('weight_rare', weight_rare),
-                ('weight_refined', weight_refined),
-                ('legendary_pulls', legendary_pulls),
-                ('epic_pulls', epic_pulls),
-                ('rare_pulls', rare_pulls)
+                ('bablo', user.bablo - final_price),
+                ('weight_legendary', user.weight_legendary),
+                ('weight_epic', user.weight_epic),
+                ('weight_rare', user.weight_rare),
+                ('weight_refined', user.weight_refined),
+                ('legendary_pulls', user.legendary_pulls),
+                ('epic_pulls', user.epic_pulls),
+                ('rare_pulls', user.rare_pulls)
             ]
             await self.db.update_user(ctx.author.id, args)
 
             self.logger.info(f"Succcesfully updated {ctx.author.name} items with the new drops!")
             # transform add drop to use executemany instead
-            tasks = [self.db.add_drop(ctx.author.id, user_banner, item_id, rarity) for item_id, _, rarity, _ in drops]
+            tasks = [self.db.add_drop(ctx.author.id, user.active_banner, item_id, rarity) for item_id, _, rarity, _ in drops]
             return_val = await asyncio.gather(*tasks)
 
-            embed = self.embed_pull_message(user_bablo - final_price, drops)
+            embed = self.embed_pull_message(user.bablo - final_price, drops)
             
             view = RollAgainButton(self, ctx, times=times)
             
@@ -148,7 +139,7 @@ class Gacha(commands.Cog, Component):
         for drop in drops:
             itemID, itemName, rarity, url = drop
 
-            current_emote, current_rank = GConstants.RARITY_MAPPING[rarity][1:]
+            current_emote, current_rank = GConstants.RARITY_MAPPING[rarity][1:] # TODO: remove constants
             mvp_rank = GConstants.RARITY_MAPPING[mvp_rarity][2]
 
             if (current_rank <= mvp_rank):
